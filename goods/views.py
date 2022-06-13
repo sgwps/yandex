@@ -31,75 +31,71 @@ class Imports(APIView):
                     }, status=400)
 
 
-    def post(self, request, format=None):
+    def post(self, request, format=None):   #offer and category to one array
         try:
             items = request.data['items']
-            update_date_string = request.data['updateDate']
-            update_date = DateValidator.validateDateString(update_date_string)
+            update_date = DateValidator.validateDateString(request.data['updateDate'])
 
-        except KeyError:
-            return Imports.response400
-        except ValueError:
-            return Imports.response400
-        offers = []
-        categories = []
-        uuids = []
-        for item in items:
-            if item['type'] == 'OFFER':
-                try:
+            
+            offers = []
+            categories = []
+            uuids = []
+            for item in items:
+                if item['type'] == 'OFFER':
                     offers.append(Offer(item['id'], item['name'], item.get('parentId', None), update_date, item['price']))
-                except KeyError:
-                    return Imports.response400
-                if not offers[-1].check():
-                    return Imports.response400
-            else:
-                try:
+                    if not offers[-1].check():
+                        raise Exception("Validation failed")
+                elif item['type'] == 'CATEGORY':
                     categories.append(Category(item['id'], item['name'], item.get('parentId', None), update_date))
-                except KeyError:
-                    return Imports.response400
-                if item.get('price', None) is not None:
-                    return Imports.response400
-                if not categories[-1].check():
-                    return Imports.response400
-            if item['id'] in uuids:
-                    return Imports.response400
-            else:
-                uuids.append(item['id'])
+                    if item.get('price', None) is not None:
+                        raise Exception("Validation failed")
+                    if not categories[-1].check():
+                        raise Exception("Validation failed")
+                else:
+                    raise Exception("Validation failed")
+                if item['id'] in uuids:
+                    raise Exception("Validation failed")
+                else:
+                    uuids.append(item['id'])
 
-        new_categories_uuid = set()
-        for category in categories:
-            if category.new:
-                new_categories_uuid.add(category.id)
-        for category in categories:
-            if category.parent_new:
-                if category.parent_id not in new_categories_uuid:
-                    return Imports.response400
-        for offer in offers:
-            if offer.parent_new:
-                if offer.parent_id not in new_categories_uuid:
-                    return Imports.response400
-        
-        delta = 1
-        while len(categories) + len(offers) > 0 and delta > 0:
+            new_categories_uuid = set()
             for category in categories:
-                if not category.parent_new:
-                    category.saveModel()
-                    print(category.saved)
-            for offer in offers:
-                if not offer.parent_new:
-                    offer.saveModel()
-            delta = len(categories) + len(offers)
-            categories = list(filter(lambda category: category.saved == False, categories))
-            offers = list(filter(lambda offer: offer.saved == False, offers))
-            delta -= len(categories) + len(offers)
+                if category.new:
+                    new_categories_uuid.add(category.id)
             for category in categories:
-                category.check_parent()
+                if category.parent_new:
+                    if category.parent_id not in new_categories_uuid:
+                        raise Exception("Validation failed")
             for offer in offers:
-                offer.check_parent()
-        if len(categories) + len(offers) == 0:
-            return HttpResponse(status=200)
-        else:
+                if offer.parent_new:
+                    if offer.parent_id not in new_categories_uuid:
+                        raise Exception("Validation failed")
+            
+            delta = 1
+            while len(categories) + len(offers) > 0 and delta > 0:  #think???
+                for category in categories:
+                    if not category.parent_new:
+                        category.saveModel()
+                        print(category.saved)
+                for offer in offers:
+                    if not offer.parent_new:
+                        offer.saveModel()
+                delta = len(categories) + len(offers)
+                categories = list(filter(lambda category: category.saved == False, categories))
+                offers = list(filter(lambda offer: offer.saved == False, offers))
+                delta -= len(categories) + len(offers)
+                for category in categories:
+                    category.check_parent()
+                for offer in offers:
+                    offer.check_parent()
+            if len(categories) + len(offers) == 0:
+                return HttpResponse(status=200)
+            else:
+                return Imports.response400
+        except Exception:
             return Imports.response400
+
+
             
             
 class Delete(APIView):

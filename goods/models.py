@@ -16,6 +16,7 @@ class ShoppingUnit(models.Model):
         summ_price = 0
         amount = 0
         price_change = PriceChange(unit=self, date=self.date, price=self.get_price)
+        price_change.save()
         for item in children:
             amount += item.amount
             summ_price += item.price

@@ -94,7 +94,7 @@ class Unit:
 
     def check_newness(self):
         unit_list = ShoppingUnit.objects.filter(pk=self.id)
-        if len(unit_list) > 0:
+        if unit_list:
             if unit_list[0].type != type(self).strtype:
                 return False
         else:
@@ -103,11 +103,12 @@ class Unit:
 
 
     def check_parent(self):
+        # 1 - сущ, кат, -1 - не сущ, 0 - товар
         self.parent_new = False
         if self.parent_id is not None:
             unit_list = ShoppingUnit.objects.filter(pk=self.parent_id)
-            if len(unit_list) > 0:
-                if ShoppingUnit.objects.filter(pk=self.parent_id)[0].type == Offer.strtype:
+            if unit_list:
+                if unit_list[0].type == Offer.strtype:
                     return False
             else:
                 self.parent_new = True
