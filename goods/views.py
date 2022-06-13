@@ -214,3 +214,5 @@ class NodeStatistic(APIView):
 
 
 
+def test(request):
+    return HttpResponse("done")
