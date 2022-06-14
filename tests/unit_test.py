@@ -1,5 +1,5 @@
-from urllib import response
-from django.test import TestCase, Client, TransactionTestCase, SimpleTestCase
+# encoding=utf8
+
 import json
 import re
 import subprocess
@@ -7,8 +7,8 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-import pytest
-from django.db import transaction
+import unittest
+
 
 API_BASEURL = "http://localhost:8000"
 
@@ -177,42 +177,7 @@ IMPORT_BATCHES = [
             }
         ],
         "updateDate": "2022-02-01T12"
-    },
-    {  #bad type
-        "items": [
-            {
-                "type": "GOOD",
-                "name": "Товары",
-                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df0",
-                "parentId": None
-            }
-        ],
-        "updateDate": "2022-02-01T12"
-    },
-    {  #category price
-        "items": [
-            {
-                "type": "CATEGORY",
-                "name": "Товары",
-                "id": "069cb8d7-ubdd-47d3-ad8f-82ef4c269df1",
-                "parentId": None,
-                "price" : 10
-            }
-        ],
-        "updateDate": "2022-02-01T12:00:00.000Z"
-    },
-    {  #price is not int
-        "items": [
-            {
-                "type": "OFFER",
-                "name": "Goldstar 68",
-                "id": "73bc3b36-0291-4245-ab35-3106c9ee1c65",
-                "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
-                "price": -69999
-            }
-        ],
-        "updateDate": "2022-02-03T15:00:00.000Z"
-    },
+    }
 ]
 
 EXPECTED_TREE = {
@@ -341,10 +306,8 @@ def print_diff(expected, response):
 def test_import():
     for index, batch in enumerate(IMPORT_BATCHES):
         print(f"Importing batch {index}")
-        c = Client()
-        response = c.post("/imports", json.dumps(batch),
-                                content_type="application/json")
-        print(response.status_code)
+        status, _ = request("/imports", method="POST", data=batch)
+        print(status)
 
     print("Test import passed.")
 
@@ -396,15 +359,14 @@ def test_delete():
     print("Test delete passed.")
 
 
-class TestUtils(TransactionTestCase):
+class TestUtils(unittest.TestCase):
 
     def test_all(self):
-        with transaction.atomic():
-            test_import()
-            #test_nodes()
-            #test_sales()
-            #test_stats()
-            #test_delete()
+        test_import()
+        #test_nodes()
+        #test_sales()
+        #test_stats()
+        #test_delete()
 
 
 def main():

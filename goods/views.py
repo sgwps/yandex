@@ -54,10 +54,11 @@ class Imports(APIView):
             for unit in units:
                 if unit.new and isinstance(unit, Category):
                     new_categories_uuid.add(unit.id)
-            
             for unit in units:
                 if unit.parent_flag == 1:
                     if unit.parent_id not in new_categories_uuid:
+                        print(request.data)
+                        print(unit.parent_flag)
                         raise Exception("Unit parent does not exist")
             
             delta = 1
@@ -74,7 +75,8 @@ class Imports(APIView):
                 return HttpResponse(status=200)
             else:
                 raise Exception("Saving error")
-        except Exception:
+        except Exception as e:
+            print(e)
             return Imports.response400
 
 
