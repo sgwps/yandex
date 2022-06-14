@@ -7,6 +7,8 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import unittest
+
 
 API_BASEURL = "http://localhost:8000"
 
@@ -85,7 +87,132 @@ IMPORT_BATCHES = [
             }
         ],
         "updateDate": "2022-02-03T15:00:00.000Z"
-    }
+    },
+    {  # change type
+        "items": [
+            {
+                "type": "OFFER",
+                "name": "Телевизор импортозамещенный",
+                "id": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1",
+                "price": 69999
+            }
+        ],
+        "updateDate": "2022-02-15T12:00:00.000Z"
+    },
+    {  #offers the first
+        "items": [
+            {
+                "type": "OFFER",
+                "name": "Paulaner",
+                "id": "98883e8f-0507-482f-bce7-2fb306cf6483",
+                "parentId": "1cc0129a-2bfe-474c-9e76-d435bf5fc8f2",
+                "price": 32999
+            },
+            {
+                "type": "OFFER",
+                "name": "Kozel",
+                "id": "74b81fda-9cdc-4b63-8977-c978afed5cf4",
+                "parentId": "1cc0129a-2bfe-474c-9e76-d435bf5fc8f2",
+                "price": 49999
+            },
+            {
+                "type": "CATEGORY",
+                "name": "Пиво",
+                "id": "1cc0129a-2bfe-474c-9e76-d435bf5fc8f2",
+                "parentId": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df1"
+            },
+        ],
+        "updateDate": "2022-02-17T12:00:00.000Z"
+    },
+    {   #parent is offer
+        "items": [
+            {
+                "type": "OFFER",
+                "name": "Kozel tmavy",
+                "id": "73bc3b36-02d1-4245-ab35-3106c9ee1c65",
+                "parentId": "74b81fda-9cdc-4b63-8977-c978afed5cf4",
+                "price": 69999
+            }
+        ],
+        "updateDate": "2022-02-03T15:00:00.000Z"
+    },
+    {   #offer to category
+        "items": [
+            {
+                "type": "CATEGORY",
+                "name": "Paulaner",
+                "id": "98883e8f-0507-482f-bce7-2fb306cf6483",
+                "parentId": "1cc0129a-2bfe-474c-9e76-d435bf5fc8f2",
+            },
+        ],
+        "updateDate": "2022-02-03T15:00:00.000Z"
+    },
+    {  #double id
+        "items": [
+            {
+                "type": "OFFER",
+                "name": "jPhone 14",
+                "id": "863e1a7a-1304-42ae-943b-179184c077e9",
+                "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+                "price": 79999
+            },
+            {
+                "type": "OFFER",
+                "name": "Xomiа Readme 11",
+                "id": "863e1a7a-1304-42ae-943b-179184c077e9",
+                "parentId": "d515e43f-f3f6-4471-bb77-6b455017a2d2",
+                "price": 59999
+            }
+        ],
+        "updateDate": "2022-02-02T12:00:00.000Z"
+    },
+    {  #bad date
+        "items": [
+            {
+                "type": "CATEGORY",
+                "name": "Товары",
+                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df0",
+                "parentId": None
+            }
+        ],
+        "updateDate": "2022-02-01T12"
+    },
+    {  #bad type
+        "items": [
+            {
+                "type": "GOOD",
+                "name": "Товары",
+                "id": "069cb8d7-bbdd-47d3-ad8f-82ef4c269df0",
+                "parentId": None
+            }
+        ],
+        "updateDate": "2022-02-01T12"
+    },
+    {  #category price
+        "items": [
+            {
+                "type": "CATEGORY",
+                "name": "Товары",
+                "id": "069cb8d7-ubdd-47d3-ad8f-82ef4c269df1",
+                "parentId": None,
+                "price" : 10
+            }
+        ],
+        "updateDate": "2022-02-01T12:00:00.000Z"
+    },
+    {  #price is not int
+        "items": [
+            {
+                "type": "OFFER",
+                "name": "Goldstar 68",
+                "id": "73bc3b36-0291-4245-ab35-3106c9ee1c65",
+                "parentId": "1cc0129a-2bfe-474c-9ee6-d435bf5fc8f2",
+                "price": -69999
+            }
+        ],
+        "updateDate": "2022-02-03T15:00:00.000Z"
+    },
 ]
 
 EXPECTED_TREE = {
@@ -214,9 +341,7 @@ def print_diff(expected, response):
 def test_import():
     for index, batch in enumerate(IMPORT_BATCHES):
         print(f"Importing batch {index}")
-        status, _ = request("/imports", method="POST", data=batch)
-
-        assert status == 200, f"Expected HTTP status code 200, got {status}"
+        print(request("/imports", method="POST", data=batch))
 
     print("Test import passed.")
 
@@ -268,12 +393,14 @@ def test_delete():
     print("Test delete passed.")
 
 
-def test_all():
-    test_import()
-    test_nodes()
-    test_sales()
-    test_stats()
-    test_delete()
+class TestUtils(unittest.TestCase):
+
+    def test_all(self):
+        test_import()
+        #test_nodes()
+        #test_sales()
+        #test_stats()
+        #test_delete()
 
 
 def main():
@@ -290,7 +417,7 @@ def main():
         API_BASEURL = API_BASEURL[:-1]
 
     if test_name is None:
-        test_all()
+        unittest.main()
     else:
         test_func = globals().get(f"test_{test_name}")
         if not test_func:
