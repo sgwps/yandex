@@ -19,7 +19,6 @@ from django.urls import path
 import goods.views
 
 urlpatterns = [
-    path('', goods.views.test),
     path('admin/', admin.site.urls),
     path('imports', goods.views.Imports.as_view()),
     path('delete/<str:id>', goods.views.Delete.as_view()),
@@ -28,6 +27,4 @@ urlpatterns = [
     path('nodes', goods.views.NodesEmpty.as_view()),
     path('sales', goods.views.Sales.as_view()),
     path('node/<str:id>/statistic', goods.views.NodeStatistic.as_view())
-
-
 ]

@@ -1,4 +1,5 @@
 from django.db import models
+from goods.date_validator import DateValidator
 
 
 
@@ -15,7 +16,7 @@ class ShoppingUnit(models.Model):
         children = ShoppingUnit.objects.filter(parentId = self)
         summ_price = 0
         amount = 0
-        price_change = PriceChange(unit=self, date=self.date, price=self.get_price)
+        price_change = PriceChange(unit=self, date=self.date, price=self.get_price())
         price_change.save()
         for item in children:
             amount += item.amount
@@ -29,8 +30,42 @@ class ShoppingUnit(models.Model):
 
 
     def get_price(self):
-        return self.price // self.amount
+        if self.amount != 0:
+            return self.price // self.amount
+        else:
+            return 0
+
+
+    def json_build(self):
+        json_dict = dict()
+        json_dict['id'] = self.id
+        json_dict['name'] = self.name
+        json_dict['date'] = DateValidator.dateToString(self.date)
+
+        json_dict['type'] = self.type
+        json_dict['price'] = self.get_price()
+        if json_dict['price'] == 0 and self.type == "CATEGORY":
+            json_dict['price'] = None
+        if self.parentId is not None:
+            json_dict['parentId'] = self.parentId.id
+        else:
+            json_dict['parentId'] = None
+        children = ShoppingUnit.objects.filter(parentId = self)
+        if len(children) > 0:
+            json_dict['children'] = []
+            for item in children:
+                json_dict['children'].append(item.json_build())
+        else:
+            json_dict['children'] = None
+        return json_dict
         
+
+    def custom_delete(self):
+        parent = self.parentId
+        self.delete()
+        if parent is not None:
+            parent.check_children()
+
 
 class PriceChange(models.Model):
     unit = models.ForeignKey(to=ShoppingUnit, on_delete=models.CASCADE)

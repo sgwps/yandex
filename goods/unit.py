@@ -1,21 +1,24 @@
 from locale import format_string
 from goods.models import ShoppingUnit, PriceChange
+from django.shortcuts import get_object_or_404
 import datetime
 
 class ShoppingUnitAdapter():
     @staticmethod
-    def update(instance_unit):
-        unit_model = ShoppingUnit.objects.filter(pk=id)[0]
+    def update(instance_unit, unit_model):
         price_change = PriceChange(unit=unit_model, date=unit_model.date, price=unit_model.get_price)
         price_change.save()
         unit_model.name = instance_unit.name
         unit_model.date = instance_unit.date
-        if instance_unit.parent_id is not None:
-            unit_model.parent = ShoppingUnit.objects.filter(pk=instance_unit.parent)[0] 
+    
         if instance_unit.price is not None:
             unit_model.price = instance_unit.price
-        unit_model.save()
-        ShoppingUnit.objects.filter(pk=instance_unit.parent)[0].check_children()
+        if instance_unit.parent_id is not None:
+            unit_model.parentId = get_object_or_404(ShoppingUnit, pk=instance_unit.parent_id)
+            unit_model.save() 
+            unit_model.parentId.check_children()
+        else:
+            unit_model.save()
 
     @staticmethod
     def create(instance_unit):
@@ -23,8 +26,7 @@ class ShoppingUnitAdapter():
         unit.id = instance_unit.id
         unit.name = instance_unit.name
         unit.date = instance_unit.date
-        if instance_unit.parent_id is not None:
-            unit.parentId = ShoppingUnit.objects.filter(pk=instance_unit.parent_id)[0]
+        
         unit.type = type(instance_unit).strtype
         if unit.type == "OFFER":
             unit.price = instance_unit.price
@@ -32,37 +34,27 @@ class ShoppingUnitAdapter():
         else:
             unit.price = 0
             unit.amount = 0
-        print(unit, "saving")
         unit.save()
+        if instance_unit.parent_id is not None:
+            unit.parentId = get_object_or_404(ShoppingUnit, pk=instance_unit.parent_id)
+            unit.save()
+            unit.parentId.check_children()
         if unit.parentId is not None:
-            ShoppingUnit.objects.filter(pk=instance_unit.parent_id)[0].check_children()
+            unit.save()
+
 
     @staticmethod
     def update_or_create(instance_unit):
-        if ShoppingUnit.objects.filter(pk=id).exists():
-            ShoppingUnitAdapter.update(instance_unit)
-        else:
+        try:
+            unit = get_object_or_404(ShoppingUnit, pk=instance_unit.id)
+            ShoppingUnitAdapter.update(instance_unit, unit)
+        except Exception:
             ShoppingUnitAdapter.create(instance_unit)
 
 
-    
-    @staticmethod
-    def delete(id):
-        unit_model = ShoppingUnit.objects.filter(pk=id)[0]
-        parent = unit_model.parentId
-        unit_model.delete()
-        if parent is not None:
-            parent.check_children()
-
 
 class Unit:
-    format_string = '%Y-%m-%dT%H:%M:%S.%f'
-
-
-    @staticmethod
-    def dateToString(date):
-        print(date)
-        return date.strftime(Unit.format_string)[:-3] + "Z"
+    
 
 
     def __init__(self, id, name, parent_id, date = None, price = 0):
@@ -93,51 +85,45 @@ class Unit:
 
 
     def check_newness(self):
-        unit_list = ShoppingUnit.objects.filter(pk=self.id)
-        if unit_list:
-            if unit_list[0].type != type(self).strtype:
-                return False
-        else:
+        '''
+        True - element is new
+        False - element is recorded in DB
+        '''
+        try:
+            unit = get_object_or_404(ShoppingUnit, pk=self.id)
+            if unit[0].type == type(self).strtype:
+                self.new = False
+            else:
+                raise Exception("Unit category cannot be changed")
+        except Exception:
             self.new = True
-        return True
 
 
     def check_parent(self):
-        # 1 - сущ, кат, -1 - не сущ, 0 - товар
-        self.parent_new = False
+        '''
+        -1 - unit doesn't have a parent
+        0 - parent is an existing category
+        1 - parent is potentially new
+        '''
         if self.parent_id is not None:
-            unit_list = ShoppingUnit.objects.filter(pk=self.parent_id)
-            if unit_list:
-                if unit_list[0].type == Offer.strtype:
-                    return False
-            else:
-                self.parent_new = True
-        return True
+            try:
+                unit = get_object_or_404(ShoppingUnit, pk=self.parent_id)
+                if unit.type == Category.strtype:
+                    self.parent_flag = 0
+                elif unit.type == Offer.strtype:
+                    raise Exception("Parent is an existing offer")
+            except Exception:
+                self.parent_flag = 1
+        else:
+            self.parent_flag = -1
 
 
-    def json_build(self):
-        json_dict = dict()
-        json_dict['id'] = self.id
-        json_dict['name'] = self.name
-        json_dict['date'] = Unit.dateToString(self.date)
-        json_dict['type'] = type(self).strtype
-        json_dict['price'] = self.price
-        if self.price == 0 and type(self).strtype == "CATEGORY":
-            json_dict['price'] = None
-        if self.parent_id is not None:
-            json_dict['parentId'] = self.parent_id
-        else:
-            json_dict['parentId'] = None
-        model_instance = ShoppingUnit.objects.filter(pk=self.id)[0]
-        children = ShoppingUnit.objects.filter(parentId = model_instance)
-        if len(children) > 0:
-            json_dict['children'] = []
-            for item in children:
-                instance = Unit.buildFromModel(item)
-                json_dict['children'].append(instance.json_build())
-        else:
-            json_dict['children'] = None
-        return json_dict
+    def validate(self):
+        self.check_parent()
+        self.check_newness()
+
+
+
 
 
 class Offer(Unit):
@@ -146,27 +132,20 @@ class Offer(Unit):
 
     def check_price(self):
         if not isinstance(self.price, int):
-            return False
+            raise Exception("Offer price must be an integer")
         elif self.price < 0:
-            return False
-        return True
+            raise Exception("Offer price cannot be less than 0")
 
 
-    def check(self):
-        if self.check_newness() and self.check_parent() and self.check_price():
-            return True
-        return False
+    def validate(self):
+        super().validate()
+        self.check_price()
 
 
 class Category(Unit):   
 
     strtype = "CATEGORY"
 
-
-    def check(self):
-        if self.check_newness() and self.check_parent():
-            return True
-        return False
 
 
 
