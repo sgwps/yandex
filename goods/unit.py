@@ -90,12 +90,12 @@ class Unit:
         False - element is recorded in DB
         '''
         try:
-            unit = get_object_or_404(ShoppingUnit, pk=self.id)
-            if unit[0].type == type(self).strtype:
+            unit = ShoppingUnit.objects.get(pk=self.id)
+            if unit.type == type(self).strtype:
                 self.new = False
             else:
                 raise Exception("Unit category cannot be changed")
-        except Exception:
+        except ShoppingUnit.DoesNotExist:
             self.new = True
 
 
