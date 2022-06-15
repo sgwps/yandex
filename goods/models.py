@@ -1,4 +1,5 @@
 from django.db import models
+from django.shortcuts import get_object_or_404
 from goods.date_validator import DateValidator
 
 
@@ -13,6 +14,7 @@ class ShoppingUnit(models.Model):
     type = models.CharField(max_length=100, choices=(("OFFER", "OFFER"), ("CATEGORY", "CATEGORY")))
 
     def check_children(self):
+
         children = ShoppingUnit.objects.filter(parentId = self)
         summ_price = 0
         amount = 0
@@ -20,16 +22,21 @@ class ShoppingUnit(models.Model):
         price_change.save()
         for item in children:
             amount += item.amount
-            summ_price += item.price
+            if item.price is not None:
+                summ_price += item.price
             self.date = max(self.date, item.date)
         self.price = summ_price
         self.amount = amount
         self.save()
+        print(self.name, self.amount, self.price)
+
         if self.parentId is not None:
             self.parentId.check_children()
 
 
     def get_price(self):
+        if self.price is None:
+            return None
         if self.amount != 0:
             return self.price // self.amount
         else:
@@ -66,11 +73,36 @@ class ShoppingUnit(models.Model):
         if parent is not None:
             parent.check_children()
 
+    @staticmethod
+    def save_import(item, date):
+        print("saving", item['name'])
+        try:
+            unit = ShoppingUnit.objects.get(pk=item['id'])
+            price_change = PriceChange(unit=unit, date=unit.date, price=unit.get_price())
+            price_change.save()
+        except ShoppingUnit.DoesNotExist:
+            unit = ShoppingUnit()
+            unit.id = item['id']
+            unit.type = item['type']
+
+        unit.name = item['name']
+        unit.date = date
+        unit.price = item.get('price')
+        if unit.type == "CATEGORY":
+            unit.amount = 0
+        else:
+            unit.amount = 1
+        if item.get('parentId') is not None:
+            unit.parentId = get_object_or_404(ShoppingUnit, pk=item['parentId'])
+            unit.save()
+            unit.parentId.check_children()
+        unit.save()
+
 
 class PriceChange(models.Model):
     unit = models.ForeignKey(to=ShoppingUnit, on_delete=models.CASCADE)
     date = models.DateTimeField()
-    price = models.IntegerField()
+    price = models.IntegerField(null=True, blank=True)
 
 
     def getType(self):

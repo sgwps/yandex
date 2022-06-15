@@ -9,8 +9,9 @@ class DateValidator:
         format_string = '%Y-%m-%dT%H:%M:%S.%f'
         return date.strftime(format_string)[:-3] + "Z"
 
+    format_string = '%Y-%m-%dT%H:%M:%S.%f%z'
+
 
     @staticmethod
     def validateDateString(date_string):
-        format_string = '%Y-%m-%dT%H:%M:%S.%f%z'
-        return datetime.datetime.strptime(date_string, format_string)
+        return datetime.datetime.strptime(date_string, DateValidator.format_string)

@@ -6,14 +6,14 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.request import Request
-from goods.unit import Category, Offer, Unit, ShoppingUnitAdapter, PriceRecord
+from goods.unit import PriceRecord
 import json
 import datetime
 from goods.models import ShoppingUnit, PriceChange
 from django.core.serializers.json import DjangoJSONEncoder
 from django.shortcuts import get_object_or_404
 from goods.date_validator import DateValidator
-
+from goods.import_schema import ImportSchema
 
 
 
@@ -31,50 +31,23 @@ class Imports(APIView):
 
     def post(self, request, format=None):   
         try:
-            items = request.data['items']
-            update_date = DateValidator.validateDateString(request.data['updateDate'])           
-            units = []
-            uuids = []
-            for item in items:
-                if item['type'] == 'OFFER':
-                    units.append(Offer(item['id'], item['name'], item.get('parentId', None), update_date, item['price']))
-                elif item['type'] == 'CATEGORY':
-                    units.append(Category(item['id'], item['name'], item.get('parentId', None), update_date))
-                    if item.get('price', None) is not None:
-                        raise Exception("Category item cannot have price")
-                else:
-                    raise Exception("Unknown type")
-                units[-1].validate()
-                if item['id'] in uuids:
-                    raise Exception("Two items with common uuid in request")
-                else:
-                    uuids.append(item['id'])
+            schema = ImportSchema()
+            import_schema = schema.load(request.data)
+            items = import_schema['items']
+            saved_categories = set()
+            while items: 
+                for item in items:
+                    if not item.get('parent_new', False) or item['parentId'] in saved_categories:
+                        ShoppingUnit.save_import(item, import_schema['updateDate'])
+                        item['saved'] = True
+                        if item['type'] == 'CATEGORY':
+                            saved_categories.add(item['id'])
 
-            new_categories_uuid = set()
-            for unit in units:
-                if unit.new and isinstance(unit, Category):
-                    new_categories_uuid.add(unit.id)
+                items = list(filter(lambda item: item.get('saved')==None, items))
+
+            return HttpResponse(status=200)
             
-            for unit in units:
-                if unit.parent_flag == 1:
-                    if unit.parent_id not in new_categories_uuid:
-                        raise Exception("Unit parent does not exist")
-            
-            delta = 1
-            while len(units) and delta > 0:  
-                for unit in units:
-                    if unit.parent_flag in (0, -1):
-                        unit.saveModel()
-                delta = len(units)
-                units = list(filter(lambda unit: unit.saved == False, units))
-                delta -= len(units)
-                for unit in units:
-                    unit.check_parent()
-            if len(units) == 0:
-                return HttpResponse(status=200)
-            else:
-                raise Exception("Saving error")
-        except Exception:
+        except Exception as e:
             return Imports.response400
 
 
