@@ -6,7 +6,6 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.request import Request
-from goods.unit import PriceRecord
 import json
 import datetime
 from goods.models import ShoppingUnit, PriceChange
@@ -141,25 +140,25 @@ class NodeStatistic(APIView):
         try:
             dateStart = DateValidator.validateDateString(request.GET["dateStart"])
             dateEnd = DateValidator.validateDateString(request.GET["dateEnd"])
+            if dateStart > dateEnd:
+                raise KeyError
         except KeyError:
             return NodeStatistic.response400
         try:
             unit = get_object_or_404(ShoppingUnit, pk=id)
         except Exception:
             return NodeStatistic.response404
-        price_change = PriceChange.objects.filter(unit=unit)
-        price_records = []
-        price_records.append(PriceRecord(unit.date, unit.price))
-        for record in price_change:
-            price_records.append(PriceRecord(record.date, record.price))
-        price_records = list(filter(lambda price_record: price_record.date <= dateEnd, price_records))
-        price_records_before = list(filter(lambda price_record: price_record.date <= dateStart, price_records))
-        price_records = list(filter(lambda price_record: price_record.date > dateStart, price_records))
+        price_changes = list(PriceChange.objects.filter(unit=unit))
+        price_changes.append(PriceChange(date=unit.date, price=unit.price))
+        price_changes = list(filter(lambda price_change: price_change.date <= dateEnd, price_changes))
+        price_changes_before = list(filter(lambda price_change: price_change.date <= dateStart, price_changes))
+        price_changes = list(filter(lambda price_change: price_change.date > dateStart, price_changes))
         result_list = []
-        if price_records_before:
-            first_record = max(price_records_before)
-            result_list.append({DateValidator.dateToString(first_record) : first_record.price})
-        for record in price_records:
+        print(price_changes, price_changes_before)
+        if price_changes_before:
+            first_record = max(price_changes_before)
+            result_list.append({DateValidator.dateToString(dateStart) : first_record.price})
+        for record in price_changes:
             result_list.append({DateValidator.dateToString(record.date) : record.price})
         json_dict = {"data" : result_list}
         return JsonResponse(json_dict)
